@@ -7,3 +7,7 @@ python-multipart
 pydantic
 requests
 ultralytics
+mlflow
+torch
+torchvision
+Pillow

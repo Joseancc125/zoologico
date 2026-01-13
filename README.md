@@ -1,3 +1,23 @@
+```` 
+
+## Deployment
+
+Se añadió un manifiesto `k8s/manifest.yaml` y un workflow de CI (`.github/workflows/build-and-deploy.yml`) que automatiza construcción y push de imágenes a GitHub Container Registry (GHCR) y despliegue a Kubernetes.
+
+- Para desplegar vía GitHub Actions: añade un secret `KUBE_CONFIG` (base64 del `kubeconfig`) en Settings → Secrets. El workflow construye imágenes y aplica `k8s/manifest.yaml` con las imágenes generadas.
+
+- Para desplegar manualmente, sustituye los placeholders en `k8s/manifest.yaml` y aplica:
+
+```bash
+sed -e "s#__ORCHESTRATOR_IMAGE__#ghcr.io/<owner>/zoologico-orchestrator:<tag>#g" \
+	-e "s#__EDGE_IMAGE__#ghcr.io/<owner>/zoologico-edge:<tag>#g" \
+	-e "s#__CLOUD_IMAGE__#ghcr.io/<owner>/zoologico-cloud:<tag>#g" \
+	-e "s#__MCP_IMAGE__#ghcr.io/<owner>/zoologico-mcp:<tag>#g" \
+	k8s/manifest.yaml > k8s/rendered.yaml
+kubectl apply -f k8s/rendered.yaml
+```
+
+Si prefieres desplegar con `docker compose` en un host remoto, copia el `docker-compose.yml` al host y ejecuta `docker compose up -d --build`.
 # Zoológico — Sistema distribuido de detección de animales
 
 Resumen

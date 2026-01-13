@@ -1,0 +1,97 @@
+name: Build, Push and Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      imgtag: ${{ steps.set_tag.outputs.imgtag }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set image tag
+      id: set_tag
+      run: echo "::set-output name=imgtag::${GITHUB_SHA::8}"
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push orchestrator
+      uses: docker/build-push-action@v4
+      with:
+        context: ./orchestrator
+        push: true
+        tags: ghcr.io/${{ github.repository_owner }}/zoologico-orchestrator:${{ steps.set_tag.outputs.imgtag }}
+
+    - name: Build and push edge agent
+      uses: docker/build-push-action@v4
+      with:
+        context: ./agents/edge_agent
+        push: true
+        tags: ghcr.io/${{ github.repository_owner }}/zoologico-edge:${{ steps.set_tag.outputs.imgtag }}
+
+    - name: Build and push cloud processor
+      uses: docker/build-push-action@v4
+      with:
+        context: ./cloud/processor
+        push: true
+        tags: ghcr.io/${{ github.repository_owner }}/zoologico-cloud:${{ steps.set_tag.outputs.imgtag }}
+
+    - name: Build and push mcp
+      uses: docker/build-push-action@v4
+      with:
+        context: ./mcp
+        push: true
+        tags: ghcr.io/${{ github.repository_owner }}/zoologico-mcp:${{ steps.set_tag.outputs.imgtag }}
+
+    - name: Upload image tag
+      uses: actions/upload-artifact@v4
+      with:
+        name: img-tag
+        path: ${{ steps.set_tag.outputs.imgtag }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: ${{ secrets.KUBE_CONFIG != '' }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Download image tag
+      uses: actions/download-artifact@v4
+      with:
+        name: img-tag
+        path: .
+
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+        chmod +x kubectl && sudo mv kubectl /usr/local/bin/
+
+    - name: Configure Kubeconfig
+      run: |
+        echo "$KUBE_CONFIG" | base64 -d > kubeconfig
+        export KUBECONFIG=$PWD/kubeconfig
+      env:
+        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Render k8s manifest with images and apply
+      env:
+        IMG_TAG: ${{ needs.build-and-push.outputs.imgtag }}
+      run: |
+        sed -e "s#__ORCHESTRATOR_IMAGE__#ghcr.io/${{ github.repository_owner }}/zoologico-orchestrator:${IMG_TAG}#g" \
+            -e "s#__EDGE_IMAGE__#ghcr.io/${{ github.repository_owner }}/zoologico-edge:${IMG_TAG}#g" \
+            -e "s#__CLOUD_IMAGE__#ghcr.io/${{ github.repository_owner }}/zoologico-cloud:${IMG_TAG}#g" \
+            -e "s#__MCP_IMAGE__#ghcr.io/${{ github.repository_owner }}/zoologico-mcp:${IMG_TAG}#g" \
+            k8s/manifest.yaml > k8s/rendered.yaml
+        kubectl apply -f k8s/rendered.yaml

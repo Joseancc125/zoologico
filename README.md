@@ -18,6 +18,27 @@ kubectl apply -f k8s/rendered.yaml
 ```
 
 Si prefieres desplegar con `docker compose` en un host remoto, copia el `docker-compose.yml` al host y ejecuta `docker compose up -d --build`.
+
+Exponer dashboard públicamente (PoC)
+----------------------------------
+
+Incluimos un `nginx` en `docker-compose.yml` que actúa como reverse-proxy y ofrece HTTPS (por defecto usando un certificado autofirmado de prueba).
+
+- Generar certificado autofirmado localmente:
+
+```bash
+bash scripts/make_selfsigned.sh
+```
+
+- Levantar servicios incluyendo `nginx`:
+
+```bash
+docker compose up --build -d
+```
+
+- Acceder al dashboard en: `https://<host>` (usa `-k` en `curl` o acepta certificado en el navegador, ya que es autofirmado).
+
+Para producción, reemplace los certificados por uno válido (Let's Encrypt/ACME) o use un proxy como Traefik con integración ACME para obtener HTTPS automáticamente.
 # Zoológico — Sistema distribuido de detección de animales
 
 Resumen
@@ -98,4 +119,46 @@ git push --set-upstream origin ci/test-sdk
 gh pr create --fill --base main --head ci/test-sdk
 
 # una vez creado, la Actions pipeline se ejecutará automáticamente.
+## Demo rápido (para mostrar al cliente)
+
+Sigue estos pasos para preparar una demo rápida y compartir la visualización con el cliente.
+
+1. Levanta los servicios (reconstruye si has cambiado código):
+
+```bash
+docker compose up --build -d
+```
+
+2. Publica una alerta de ejemplo (script incluido):
+
+```bash
+chmod +x scripts/demo_post_alert.sh
+./scripts/demo_post_alert.sh http://localhost:8000 cam-demo-1
+```
+
+3. Abre la visualización en el navegador:
+
+- Directo al dashboard: `http://localhost:8200/visual`
+- Vía reverse-proxy TLS (si está configurado): `https://localhost/`
+
+4. Dentro de la UI puedes:
+
+- Pulsar `Play` para reproducir el stream simulado.
+- `Descargar imagen` para exportar el frame actual como PNG.
+- `Generar iFrame` para obtener un snippet embebible y pegarlo en una presentación.
+
+5. Comprobar miniaturas guardadas (desde host):
+
+```bash
+ls -l uploads
+curl -sS http://localhost:8200/uploads/<nombre>.jpg -o /tmp/thumbnail.jpg && file /tmp/thumbnail.jpg
+```
+
+Nota: si `GET /visual/frames` devuelve 0 resultados, reconstruye el servicio `dashboard` para cargar los últimos cambios:
+
+```bash
+docker compose up -d --build dashboard
+```
+
+Contacta si quieres que prepare una versión empaquetada del demo (Docker image + ejemplo de iframe listo para compartir).
 ```

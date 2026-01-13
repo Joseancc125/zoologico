@@ -9,6 +9,7 @@ services:
     command: python /app/mcp/server.py
     volumes:
       - ./:/app
+      - ./uploads:/app/uploads
     ports:
       - "9000:9000"
   orchestrator:
@@ -19,6 +20,8 @@ services:
     working_dir: /app
     volumes:
       - ./:/app
+      - ./uploads:/app/uploads
+      - ./data:/app/data
     ports:
       - "8000:8000"
   edge_agent:
@@ -31,6 +34,7 @@ services:
       - ORCHESTRATOR_URL=http://orchestrator:8000/alert
     volumes:
       - ./:/app
+      - ./uploads:/app/uploads
     ports:
       - "8100:8100"
   cloud_processor:
@@ -59,3 +63,28 @@ services:
     command: sh -c "pip install -r requirements.txt && python cloud/training/ddp_train.py --rank 0 --world_size 1"
     volumes:
       - ./:/app
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    image: zoologico-dashboard:local
+    working_dir: /app
+    ports:
+      - "8200:8200"
+    environment:
+      - ORCHESTRATOR_URL=http://orchestrator:8000
+    volumes:
+      - ./:/app
+      - ./uploads:/app/uploads
+    depends_on:
+      - orchestrator
+  nginx:
+    image: nginx:stable-alpine
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certs:/etc/nginx/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - dashboard

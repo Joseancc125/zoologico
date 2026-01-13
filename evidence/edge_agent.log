@@ -1,0 +1,4 @@
+edge_agent-1  | INFO:     Started server process [1]
+edge_agent-1  | INFO:     Waiting for application startup.
+edge_agent-1  | INFO:     Application startup complete.
+edge_agent-1  | INFO:     Uvicorn running on http://0.0.0.0:8100 (Press CTRL+C to quit)

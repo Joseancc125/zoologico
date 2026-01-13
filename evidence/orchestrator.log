@@ -1,0 +1,6 @@
+orchestrator-1  | INFO:     Started server process [1]
+orchestrator-1  | INFO:     Waiting for application startup.
+orchestrator-1  | INFO:     Application startup complete.
+orchestrator-1  | INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+orchestrator-1  | INFO:     172.18.0.1:35626 - "POST /alert HTTP/1.1" 200 OK
+orchestrator-1  | INFO:     172.18.0.5:59974 - "POST /mcp_callback HTTP/1.1" 200 OK

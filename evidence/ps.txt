@@ -1,0 +1,7 @@
+NAME                          IMAGE                             COMMAND                  SERVICE           CREATED          STATUS          PORTS
+zoologico-cloud_processor-1   zoologico-cloud-processor:local   "python cloud/proces…"   cloud_processor   5 minutes ago    Up 4 minutes    0.0.0.0:5000->5000/tcp, [::]:5000->5000/tcp
+zoologico-dashboard-1         zoologico-dashboard:local         "uvicorn dashboard.a…"   dashboard         5 minutes ago    Up 4 minutes    0.0.0.0:8200->8200/tcp, [::]:8200->8200/tcp
+zoologico-edge_agent-1        zoologico-edge-agent:local        "uvicorn agents.edge…"   edge_agent        5 minutes ago    Up 4 minutes    0.0.0.0:8100->8100/tcp, [::]:8100->8100/tcp
+zoologico-mcp-1               zoologico-mcp:local               "python /app/mcp/ser…"   mcp               5 minutes ago    Up 4 minutes    0.0.0.0:9000->9000/tcp, [::]:9000->9000/tcp
+zoologico-nginx-1             nginx:stable-alpine               "/docker-entrypoint.…"   nginx             42 minutes ago   Up 42 minutes   0.0.0.0:80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+zoologico-orchestrator-1      zoologico-orchestrator:local      "uvicorn orchestrato…"   orchestrator      5 minutes ago    Up 4 minutes    0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp

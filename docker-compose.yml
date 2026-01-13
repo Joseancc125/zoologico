@@ -1,0 +1,32 @@
+version: '3.8'
+services:
+  mcp:
+    image: python:3.11-slim
+    working_dir: /app
+    command: python mcp/server.py
+    volumes:
+      - ./:/app
+    ports:
+      - "9000:9000"
+  orchestrator:
+    image: python:3.11-slim
+    working_dir: /app
+    command: uvicorn orchestrator.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./:/app
+    ports:
+      - "8000:8000"
+  edge_agent:
+    image: python:3.11-slim
+    working_dir: /app
+    command: uvicorn agents.edge_agent.app:app --host 0.0.0.0 --port 8100
+    volumes:
+      - ./:/app
+    ports:
+      - "8100:8100"
+  cloud_processor:
+    image: python:3.11-slim
+    working_dir: /app
+    command: python cloud/processor/main.py
+    volumes:
+      - ./:/app

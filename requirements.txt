@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+aiohttp
+opencv-python
+numpy
+python-multipart
+pydantic
+requests
+ultralytics

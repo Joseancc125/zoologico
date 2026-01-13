@@ -20,148 +20,214 @@
       .node img{max-width:100%;max-height:100%}
       .cloud{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
       .cloud .cloud-node{width:40px;height:30px;border-radius:6px;background:#fff;border:1px solid #e1eef0}
-      .arrow{font-size:24px;color:#0ea5a4;text-align:center}
-      .graph{background:#fff;padding:12px;border-radius:8px;border:1px solid #e6f2f4}
-      .legend{font-size:13px;color:#666;margin-top:8px}
-      .btn{background:#0ea5a4;color:#fff;padding:8px 10px;border-radius:6px;border:none;cursor:pointer}
-      .row{display:flex;gap:8px;align-items:center}
-      .bbox{position:absolute;border:3px solid rgba(255,0,0,0.9);box-sizing:border-box}
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <header>
-        <h1>Zoológico — Topología distribuida</h1>
-        <div class="row">
-          <a href="/" class="btn">Volver al dashboard</a>
-        </div>
-      </header>
-
-      <p>Ejemplo conceptual: cámaras → cluster local (detección urgente) → nube (análisis histórico).</p>
-
-      <div class="topology">
-        <div style="flex:1">
-          <div class="graph">
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-              <label style="font-weight:600">Cámara:</label>
-              <select id="camera_select"><option value="">Todas</option></select>
-              <label style="font-weight:600">Rango:</label>
-              <select id="hours_select"><option value="24">24h</option><option value="48">48h</option><option value="168">7d</option><option value="0">Custom</option></select>
-              <input id="custom_from" type="datetime-local" style="display:none"/>
-              <input id="custom_to" type="datetime-local" style="display:none"/>
-              <button id="btn_refresh" class="btn">Refrescar</button>
-              <button id="btn_play" class="btn">Play</button>
-              <button id="btn_pause" class="btn" style="display:none">Pause</button>
-            </div>
-            <div style="display:flex;gap:12px">
-              <div style="flex:1;position:relative">
-                <canvas id="video_canvas" width="640" height="360" style="background:#000;display:block;border-radius:6px"></canvas>
-                <div id="bbox_layer" style="position:absolute;left:0;top:0;width:640px;height:360px;pointer-events:none"></div>
+      <!doctype html>
+      <html lang="es">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Zoológico — Visualización en tiempo</title>
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+          <style>
+            :root{--bg:#f5fbfb;--card:#ffffff;--accent:#0ea5a4;--muted:#6b7280}
+            *{box-sizing:border-box}
+            body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial; margin:0;background:var(--bg);color:#0f172a}
+            .page{max-width:1200px;margin:18px auto;padding:16px}
+            header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+            h1{font-size:18px;margin:0}
+            .controls{display:flex;gap:8px;align-items:center}
+            .card{background:var(--card);border-radius:10px;padding:12px;border:1px solid #e6f2f4}
+            .layout{display:grid;grid-template-columns:1fr 340px;gap:12px}
+            #player{position:relative;width:100%;padding-top:56.25%;overflow:hidden;border-radius:8px;background:#111}
+            #player img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain}
+            #overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+            .bbox{position:absolute;border:3px solid rgba(255,70,70,0.95);box-shadow:0 2px 6px rgba(0,0,0,0.15);background:linear-gradient(0deg,rgba(255,255,255,0.02),transparent)}
+            .controls .btn{background:var(--accent);color:white;padding:8px 10px;border-radius:8px;border:none;cursor:pointer}
+            .muted{color:var(--muted);font-size:13px}
+            .panel{height:560px;overflow:auto}
+            .thumb{display:flex;gap:8px;align-items:center;padding:8px;border-radius:8px;border:1px solid #eef6f6;margin-bottom:8px}
+            .thumb img{width:96px;height:56px;object-fit:cover;border-radius:6px}
+            .meta{font-size:13px}
+            .filter-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+            input[type=datetime-local]{padding:6px;border-radius:6px;border:1px solid #dbeafe}
+            select, input[type=number]{padding:6px;border-radius:6px;border:1px solid #dbeafe}
+            .footer{margin-top:12px;font-size:13px;color:var(--muted)}
+          </style>
+        </head>
+        <body>
+          <div class="page">
+            <header>
+              <h1>Zoológico — Visualización</h1>
+              <div class="controls">
+                <a href="/" class="btn">Volver</a>
               </div>
-              <div style="width:220px">
-                <div style="display:flex;gap:8px;margin-bottom:8px">
-                  <button id="btn_export" class="btn">Descargar imagen</button>
-                  <button id="btn_embed" class="btn">Generar iFrame</button>
+            </header>
+
+            <div class="card">
+              <div class="filter-row">
+                <label class="muted">Cámara</label>
+                <select id="camera_select"><option value="">Todas</option></select>
+                <label class="muted">Rango</label>
+                <select id="hours_select"><option value="24">24h</option><option value="48">48h</option><option value="168">7d</option><option value="0">Custom</option></select>
+                <input id="custom_from" type="datetime-local" style="display:none">
+                <input id="custom_to" type="datetime-local" style="display:none">
+                <button id="btn_refresh" class="btn">Refrescar</button>
+                <button id="btn_play" class="btn">Play</button>
+                <button id="btn_pause" class="btn" style="display:none">Pause</button>
+                <label class="muted">Velocidad</label>
+                <input id="speed" type="number" value="1" min="0.2" step="0.2" style="width:72px">
+              </div>
+
+              <div class="layout" style="margin-top:12px">
+                <div>
+                  <div id="player" class="card">
+                    <img id="main_img" src="" alt="frame"/>
+                    <div id="overlay"></div>
+                  </div>
+                  <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                    <button id="btn_prev" class="btn">Prev</button>
+                    <button id="btn_next" class="btn">Next</button>
+                    <button id="btn_export" class="btn">Descargar</button>
+                    <button id="btn_iframe" class="btn">iFrame</button>
+                    <div style="margin-left:auto" class="muted">Frame: <span id="frame_info">-</span></div>
+                  </div>
+                  <div class="footer">Use los controles para reproducir y filtrar. Las cajas se dibujan usando las coordenadas reales de detección.</div>
                 </div>
-                <div style="font-size:13px;color:#333"><strong>Frame:</strong> <span id="frame_info">-</span></div>
-                <div style="margin-top:8px;font-size:13px;color:#666">Filtrado / paginación</div>
-                <div style="margin-top:8px"><button id="btn_prev" class="btn">Prev</button> <button id="btn_next" class="btn">Next</button></div>
+
+                <aside class="panel">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <div class="muted">Miniaturas</div>
+                    <div><button id="btn_clear" class="btn">Borrar filtro</button></div>
+                  </div>
+                  <div id="thumbs"></div>
+                  <div style="margin-top:6px;display:flex;justify-content:center;gap:6px">
+                    <button id="page_prev" class="btn">«</button>
+                    <div class="muted" id="page_info">Página 1</div>
+                    <button id="page_next" class="btn">»</button>
+                  </div>
+                </aside>
               </div>
             </div>
-            <div class="legend">Stream simulado desde miniaturas en `uploads` — dibuja bounding boxes reales.</div>
           </div>
-        </div>
 
-        <div style="width:340px" class="graph">
-          <h3 style="margin-top:0">Tendencia de detecciones (últimas 24h)</h3>
-          <canvas id="chart" width="300" height="160"></canvas>
-          <div class="legend">Tendencia</div>
-        </div>
-      </div>
-    </div>
+          <script>
+            const API = '/visual/frames';
+            let items = [], page = 1, perPage = 12, total = 0, playIndex = 0, playTimer = null;
+            const mainImg = document.getElementById('main_img');
+            const overlay = document.getElementById('overlay');
+            const thumbs = document.getElementById('thumbs');
+            const cameraSelect = document.getElementById('camera_select');
+            const hoursSelect = document.getElementById('hours_select');
+            const btnRefresh = document.getElementById('btn_refresh');
+            const btnPlay = document.getElementById('btn_play');
+            const btnPause = document.getElementById('btn_pause');
+            const btnPrev = document.getElementById('btn_prev');
+            const btnNext = document.getElementById('btn_next');
+            const btnExport = document.getElementById('btn_export');
+            const btnIframe = document.getElementById('btn_iframe');
+            const frameInfo = document.getElementById('frame_info');
+            const pagePrev = document.getElementById('page_prev');
+            const pageNext = document.getElementById('page_next');
+            const pageInfo = document.getElementById('page_info');
+            const speedInput = document.getElementById('speed');
+            const btnClear = document.getElementById('btn_clear');
+            const customFrom = document.getElementById('custom_from');
+            const customTo = document.getElementById('custom_to');
 
-    <script>
-      // utilities
-      const API = '/visual/frames';
-      let frames = [];
-      let playIndex = 0;
-      let playing = false;
-      let playTimer = null;
+            hoursSelect.addEventListener('change', ()=>{
+              if(hoursSelect.value==='0'){ customFrom.style.display='inline-block'; customTo.style.display='inline-block'; } else { customFrom.style.display='none'; customTo.style.display='none'; }
+            });
 
-      const cameraSelect = document.getElementById('camera_select');
-      const hoursSelect = document.getElementById('hours_select');
-      const btnRefresh = document.getElementById('btn_refresh');
-      const btnPlay = document.getElementById('btn_play');
-      const btnPause = document.getElementById('btn_pause');
-      const videoCanvas = document.getElementById('video_canvas');
-      const bboxLayer = document.getElementById('bbox_layer');
-      const ctx = videoCanvas.getContext('2d');
-      const frameInfo = document.getElementById('frame_info');
-      const btnExport = document.getElementById('btn_export');
-      const btnEmbed = document.getElementById('btn_embed');
-      const btnPrev = document.getElementById('btn_prev');
-      const btnNext = document.getElementById('btn_next');
+            async function loadFrames(){
+              const cam = cameraSelect.value || '';
+              const hours = hoursSelect.value || '24';
+              const q = new URLSearchParams();
+              if(cam) q.set('camera_id', cam);
+              q.set('hours', hours);
+              q.set('limit', 500);
+              try{
+                const res = await fetch(API + '?' + q.toString());
+                const data = await res.json();
+                items = data.results || [];
+                total = items.length;
+                page = 1; renderPage(); populateCameraList();
+              }catch(e){ console.error('loadFrames',e); }
+            }
 
-      function parseQuery() {
-        const qp = new URLSearchParams(location.search);
-        return {camera_id: qp.get('camera_id') || '', hours: qp.get('hours') || '24'};
-      }
+            function populateCameraList(){
+              const cams = Array.from(new Set(items.map(i=>i.camera_id).filter(Boolean)));
+              cameraSelect.innerHTML = '<option value="">Todas</option>' + cams.map(c=>`<option value="${c}">${c}</option>`).join('');
+            }
 
-      async function fetchFrames(camera_id, hours){
-        const q = new URLSearchParams();
-        if(camera_id) q.set('camera_id', camera_id);
-        q.set('hours', hours||24);
-        q.set('limit', 300);
-        const res = await fetch(API + '?' + q.toString());
-        if(!res.ok) return [];
-        const data = await res.json();
-        return data.results || [];
-      }
+            function renderPage(){
+              const start = (page-1)*perPage; const slice = items.slice(start,start+perPage);
+              thumbs.innerHTML = '';
+              slice.forEach((it, idx)=>{
+                const el = document.createElement('div'); el.className='thumb';
+                const img = document.createElement('img'); img.src = it.thumbnail_url || it.frame_url || it.image || '';
+                const meta = document.createElement('div'); meta.className='meta'; meta.innerHTML = `<div><strong>${it.camera_id||'-'}</strong></div><div class='muted'>${new Date((it.received_at||0)*1000).toLocaleString()}</div>`;
+                el.appendChild(img); el.appendChild(meta);
+                el.addEventListener('click', ()=>{ showItem(it); playIndex = start + idx; });
+                thumbs.appendChild(el);
+              });
+              pageInfo.textContent = `Página ${page} — ${Math.ceil(total/perPage)||1}`;
+            }
 
-      function populateCameraList(items){
-        const cams = Array.from(new Set(items.map(i=>i.camera_id).filter(Boolean)));
-        cameraSelect.innerHTML = '<option value="">Todas</option>' + cams.map(c=>`<option value="${c}">${c}</option>`).join('');
-      }
+            function clearOverlay(){ overlay.innerHTML = ''; }
+            function drawBoxes(dets, imgEl){
+              clearOverlay(); if(!dets || dets.length===0) return;
+              const iw = imgEl.naturalWidth || imgEl.width; const ih = imgEl.naturalHeight || imgEl.height;
+              const rw = imgEl.clientWidth; const rh = imgEl.clientHeight;
+              const scaleX = rw / iw; const scaleY = rh / ih;
+              dets.forEach(d=>{
+                const [x1,y1,x2,y2] = d.bbox; const w = (x2-x1)*scaleX; const h = (y2-y1)*scaleY; const left = x1*scaleX; const top = y1*scaleY;
+                const b = document.createElement('div'); b.className='bbox'; b.style.left = left+'px'; b.style.top = top+'px'; b.style.width = w+'px'; b.style.height = h+'px'; b.title = `${d.label||''} ${(d.confidence||0).toFixed(2)}`;
+                overlay.appendChild(b);
+              });
+            }
 
-      function clearBBoxes(){ bboxLayer.innerHTML = ''; }
+            function showItem(it){
+              if(!it) return; const src = it.thumbnail_url || it.frame_url || it.image || '';
+              mainImg.src = src; frameInfo.textContent = `${it.camera_id||'-'} @ ${new Date((it.received_at||0)*1000).toLocaleString()}`;
+              mainImg.onload = ()=>{
+                // detections may live at metadata.detections
+                let dets = it.detections || it.predictions || (it.metadata && it.metadata.detections) || [];
+                if(typeof dets === 'string'){
+                  try{ dets = JSON.parse(dets); }catch(e){ dets = []; }
+                }
+                drawBoxes(dets, mainImg);
+              };
+            }
 
-      function drawBBoxesOnTop(detections, imgW, imgH, canvasW, canvasH){
-        clearBBoxes();
-        if(!detections || !detections.length) return;
-        const scaleX = canvasW / imgW;
-        const scaleY = canvasH / imgH;
-        detections.forEach(d=>{
-          const [x1,y1,x2,y2] = d.bbox;
-          const left = x1 * scaleX; const top = y1 * scaleY; const w = (x2-x1) * scaleX; const h = (y2-y1) * scaleY;
-          const el = document.createElement('div');
-          el.className = 'bbox';
-          el.style.left = left + 'px'; el.style.top = top + 'px'; el.style.width = w + 'px'; el.style.height = h + 'px';
-          el.style.borderColor = 'rgba(255,0,0,0.9)';
-          el.title = (d.label || '') + ' ' + Math.round((d.confidence||0)*100) + '%';
-          bboxLayer.appendChild(el);
-        });
-      }
+            btnPrev.addEventListener('click', ()=>{ if(items.length===0) return; playIndex = Math.max(0, playIndex-1); showItem(items[playIndex]); });
+            btnNext.addEventListener('click', ()=>{ if(items.length===0) return; playIndex = Math.min(items.length-1, playIndex+1); showItem(items[playIndex]); });
+            pagePrev.addEventListener('click', ()=>{ if(page>1){ page--; renderPage(); } });
+            pageNext.addEventListener('click', ()=>{ if((page*perPage) < total){ page++; renderPage(); } });
 
-      async function renderFrame(item){
-        // item should contain thumbnail_url and optionally detections
-        if(!item) return;
-        const src = item.thumbnail_url || item.frame_url || item.frame || item.image;
-        if(!src) return;
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = src;
-        await new Promise((res, rej)=>{ img.onload = ()=>res(); img.onerror = ()=>res(); setTimeout(()=>res(), 2000); });
-        // resize canvas to image aspect
-        const cw = videoCanvas.width; const ch = videoCanvas.height;
-        // draw image letterboxed
-        ctx.clearRect(0,0,cw,ch);
-        const arImg = img.naturalWidth / (img.naturalHeight || 1);
-        const arCanvas = cw / ch;
-        let dw = cw, dh = ch, dx = 0, dy = 0;
-        if(arImg > arCanvas){ // image wider
-          dw = cw; dh = Math.round(cw / arImg); dy = Math.round((ch - dh)/2);
-        } else {
-          dh = ch; dw = Math.round(ch * arImg); dx = Math.round((cw - dw)/2);
+            btnPlay.addEventListener('click', ()=>{
+              if(playTimer) return; btnPlay.style.display='none'; btnPause.style.display='inline-block';
+              playTimer = setInterval(()=>{ if(items.length===0) return; showItem(items[playIndex]); playIndex = (playIndex+1)%items.length; }, 1000/Math.max(0.2,parseFloat(speedInput.value||1))); 
+            });
+            btnPause.addEventListener('click', ()=>{ clearInterval(playTimer); playTimer=null; btnPause.style.display='none'; btnPlay.style.display='inline-block'; });
+
+            btnExport.addEventListener('click', ()=>{
+              try{
+                const canvas = document.createElement('canvas'); const w = mainImg.naturalWidth || mainImg.width; const h = mainImg.naturalHeight || mainImg.height; canvas.width = w; canvas.height = h; const cctx = canvas.getContext('2d'); cctx.drawImage(mainImg,0,0,w,h); const url = canvas.toDataURL('image/png'); const a = document.createElement('a'); a.href=url; a.download = `frame_${Date.now()}.png`; document.body.appendChild(a); a.click(); a.remove();
+              }catch(e){ console.error(e); }
+            });
+
+            btnIframe.addEventListener('click', ()=>{
+              const cam = cameraSelect.value || ''; const hours = hoursSelect.value || '24'; const src = location.origin + location.pathname + `?camera_id=${encodeURIComponent(cam)}&hours=${encodeURIComponent(hours)}`; const snippet = `<iframe src="${src}" width="800" height="450" frameborder="0"></iframe>`; prompt('Copia el código iFrame', snippet);
+            });
+
+            btnClear.addEventListener('click', ()=>{ cameraSelect.value=''; hoursSelect.value='24'; loadFrames(); });
+
+            btnRefresh.addEventListener('click', ()=>{ loadFrames(); });
+
+            // init
+            (async ()=>{ await loadFrames(); if(items.length>0) showItem(items[0]); })();
+          </script>
+        </body>
+      </html>
         }
         ctx.drawImage(img, dx, dy, dw, dh);
         // draw boxes scaled relative to natural image size

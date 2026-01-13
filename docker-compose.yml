@@ -1,33 +1,44 @@
 version: '3.8'
 services:
   mcp:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: mcp/Dockerfile
+    image: zoologico-mcp:local
     working_dir: /app
-    command: python mcp/server.py
+    command: python /app/mcp/server.py
     volumes:
       - ./:/app
     ports:
       - "9000:9000"
   orchestrator:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: orchestrator/Dockerfile
+    image: zoologico-orchestrator:local
     working_dir: /app
-    command: uvicorn orchestrator.main:app --host 0.0.0.0 --port 8000
     volumes:
       - ./:/app
     ports:
       - "8000:8000"
   edge_agent:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: agents/edge_agent/Dockerfile
+    image: zoologico-edge-agent:local
     working_dir: /app
-    command: uvicorn agents.edge_agent.app:app --host 0.0.0.0 --port 8100
+    environment:
+      - ORCHESTRATOR_URL=http://orchestrator:8000/alert
     volumes:
       - ./:/app
     ports:
       - "8100:8100"
   cloud_processor:
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: cloud/processor/Dockerfile
+    image: zoologico-cloud-processor:local
     working_dir: /app
-    command: python cloud/processor/main.py
     volumes:
       - ./:/app
     ports:
@@ -42,3 +53,9 @@ services:
       - ./mlflow.db:/app/mlflow.db
     ports:
       - "5001:5001"
+  trainer:
+    image: python:3.11-slim
+    working_dir: /app
+    command: sh -c "pip install -r requirements.txt && python cloud/training/ddp_train.py --rank 0 --world_size 1"
+    volumes:
+      - ./:/app

@@ -7,6 +7,24 @@ import asyncio
 import json
 
 SUBSCRIBERS = []
+import os
+import json as _json
+_PERSIST_FILE = os.path.join(os.getcwd(), 'mcp_subscribers.json')
+
+def _load_subscribers():
+    try:
+        with open(_PERSIST_FILE, 'r') as f:
+            data = _json.load(f)
+            return data.get('subscribers', [])
+    except Exception:
+        return []
+
+def _save_subscribers():
+    try:
+        with open(_PERSIST_FILE, 'w') as f:
+            _json.dump({'subscribers': SUBSCRIBERS}, f)
+    except Exception:
+        pass
 
 routes = web.RouteTableDef()
 
@@ -24,7 +42,13 @@ async def subscribe(request):
     url = body.get('callback_url')
     if url and url not in SUBSCRIBERS:
         SUBSCRIBERS.append(url)
+        _save_subscribers()
     return web.json_response({'status':'subscribed','callback':url})
+
+
+@routes.get('/subscribers')
+async def list_subscribers(request):
+    return web.json_response({'subscribers': SUBSCRIBERS})
 
 async def _post(url, data):
     import aiohttp
@@ -36,6 +60,7 @@ async def _post(url, data):
 
 app = web.Application()
 app.add_routes(routes)
-
 if __name__ == '__main__':
+    # cargar subscriptores previamente almacenados
+    SUBSCRIBERS[:] = _load_subscribers()
     web.run_app(app, port=9000)

@@ -6,7 +6,8 @@ import uuid
 from . import detector
 
 app = FastAPI(title="Edge Agent")
-ORCHESTRATOR_URL = "http://orchestrator:8000/alert"
+import os
+ORCHESTRATOR_URL = os.environ.get('ORCHESTRATOR_URL', "http://localhost:8000/alert")
 
 class Detection(BaseModel):
     camera_id: str

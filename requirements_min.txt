@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+aiohttp
+requests
+flask
+Pillow
+pydantic
+python-multipart
